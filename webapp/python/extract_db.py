@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 import _pickle as pickle
 import os
 import MySQLdb
@@ -18,11 +19,15 @@ def dbh():
 
 
 def main():
+    parser = ArgumentParser()
+    parser.add_argument("-t", "--table_name", type=str)
+
+    args = parser.parse_args()
     try:
         conn = dbh()
         station_list = []
         with conn.cursor() as c:
-            sql = "SELECT id,name,is_stop_express,is_stop_semi_express,is_stop_local FROM `station_master` ORDER BY id"
+            sql = "SELECT * FROM `{}` ORDER BY id".format(args.table_name)
             c.execute(sql)
 
             while True:
@@ -31,16 +36,13 @@ def main():
                 if station is None:
                     break
 
-                station["is_stop_express"] = True if station["is_stop_express"] else False
-                station["is_stop_semi_express"] = True if station["is_stop_semi_express"] else False
-                station["is_stop_local"] = True if station["is_stop_local"] else False
                 station_list.append(station)
 
     except MySQLdb.Error as err:
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
-    with open("station_master.pkl", "wb") as fout:
+    with open("{}.pkl".format(args.table_name), "wb") as fout:
         pickle.dump(station_list, fout)
 
 
