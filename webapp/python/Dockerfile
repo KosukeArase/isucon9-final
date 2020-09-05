@@ -9,4 +9,4 @@ ADD requirements.txt /opt/webapp
 
 RUN pip install -r requirements.txt
 
-CMD ["gunicorn" ,"app:app", "--reload", "-b", "0.0.0.0:8000"]
+CMD ["gunicorn" ,"app:app", "-c", "gunicorn.conf.py"]
