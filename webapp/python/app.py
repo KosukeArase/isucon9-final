@@ -250,7 +250,7 @@ def get_stations():
     try:
         conn = dbh()
         with conn.cursor() as c:
-            sql = "SELECT * FROM `station_master` ORDER BY id"
+            sql = "SELECT id,name,is_stop_express,is_stop_semi_express,is_stop_local FROM `station_master` ORDER BY id"
             c.execute(sql)
 
             while True:
@@ -259,7 +259,6 @@ def get_stations():
                 if station is None:
                     break
 
-                station = filter_dict_keys(station, ["id", "name", "is_stop_express", "is_stop_semi_express", "is_stop_local"])
                 station["is_stop_express"] = True if station["is_stop_express"] else False
                 station["is_stop_semi_express"] = True if station["is_stop_semi_express"] else False
                 station["is_stop_local"] = True if station["is_stop_local"] else False
