@@ -27,7 +27,7 @@ def main():
         conn = dbh()
         station_list = []
         with conn.cursor() as c:
-            sql = "SELECT * FROM `{}` ORDER BY id".format(args.table_name)
+            sql = "SELECT * FROM `{}`".format(args.table_name)
             c.execute(sql)
 
             while True:
