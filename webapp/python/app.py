@@ -386,11 +386,10 @@ def get_train_search():
                         # 乗りたい時刻より出発時刻が前なので除外
                         continue
 
-                    # premium_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", False)
-                    # premium_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", True)
-                    # reserved_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", False)
-                    # reserved_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", True)
-                    premium_avail_seats, premium_smoke_avail_seats, reserved_avail_seats, reserved_smoke_avail_seats = [], [], [], []
+                    premium_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", False)
+                    premium_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", True)
+                    reserved_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", False)
+                    reserved_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", True)
 
                     premium_avail = "○"
                     if len(premium_avail_seats) == 0:
@@ -813,16 +812,10 @@ def post_reserve():
 
 
                 # 予約情報の乗車区間の駅IDを求める
-                # sql = "SELECT * FROM station_master WHERE name=%s"
-                # c.execute(sql, (reservation["departure"],))
-                # reservedfromStation = c.fetchone()
                 reservedfromStation = filter_by_column(station_master, 'name', reservation['departure'])
-                print('========', reservedfromStation)
                 if not reservedfromStation:
                     raise HttpException(requests.codes['internal_server_error'], "予約情報に記載された列車の乗車駅データがみつかりません")
 
-                # c.execute(sql, (reservation["arrival"],))
-                # reservedtoStation = c.fetchone()
                 reservedtoStation = filter_by_column(station_master, 'name', reservation['arrival'])
                 if not reservedtoStation:
                     raise HttpException(requests.codes['internal_server_error'], "予約情報に記載された列車の降車駅データがみつかりません")
