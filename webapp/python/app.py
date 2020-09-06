@@ -7,6 +7,7 @@ import logging
 import flask
 import pbkdf2
 import requests
+import _pickle as pickle
 import MySQLdb.cursors
 
 JST = datetime.timezone(datetime.timedelta(hours=+9), 'JST')
@@ -18,7 +19,6 @@ AvailableDays = 10
 SessionName   = "session_isutrain"
 
 TrainClassMap = {"express": "最速", "semi_express": "中間", "local": "遅いやつ"}
-
 
 class HttpException(Exception):
     status_code = 500
@@ -33,6 +33,23 @@ class HttpException(Exception):
         response.status_code = self.status_code
         return response
 
+def load_onmemory(filename):
+    try:
+        station_master = pickle.load(open('{}'.format(filename), 'rb'))
+    except:
+        raise HttpException('you should dump {} into pkl object first.'.format(filename))
+    return station_master
+
+station_master = load_onmemory('./station_master.pkl')
+station_master_order_by_distance = load_onmemory('./station_master_order_by_distance.pkl')
+station_master_order_by_id = load_onmemory('./station_master_order_by_id.pkl')
+train_master = load_onmemory('./train_master.pkl')
+
+def filter_by_column(records, column_name, value):
+    for rec in records:
+        if rec[column_name] == value:
+            return rec
+    return None
 
 
 def dbh():
@@ -244,28 +261,14 @@ def make_reservation_response(c, reservation):
 
 @app.route("/api/stations", methods=["GET"])
 def get_stations():
-
     station_list = []
-
     try:
-        conn = dbh()
-        with conn.cursor() as c:
-            sql = "SELECT id,name,is_stop_express,is_stop_semi_express,is_stop_local FROM `station_master` ORDER BY id"
-            c.execute(sql)
-
-            while True:
-                station = c.fetchone()
-
-                if station is None:
-                    break
-
-                station["is_stop_express"] = True if station["is_stop_express"] else False
-                station["is_stop_semi_express"] = True if station["is_stop_semi_express"] else False
-                station["is_stop_local"] = True if station["is_stop_local"] else False
-                station_list.append(station)
-
-    except MySQLdb.Error as err:
-        app.logger.exception(err)
+        for station in station_master_order_by_id:
+            station["is_stop_express"] = True if station["is_stop_express"] else False
+            station["is_stop_semi_express"] = True if station["is_stop_semi_express"] else False
+            station["is_stop_local"] = True if station["is_stop_local"] else False
+            station_list.append(station)
+    except:
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
     return flask.jsonify(station_list)
@@ -291,18 +294,13 @@ def get_train_search():
     try:
         conn = dbh()
         with conn.cursor() as c:
-            sql = "SELECT * FROM station_master WHERE name=%s"
-            c.execute(sql, (from_name, ))
-            from_station = c.fetchone()
+            from_station = filter_by_column(station_master, 'name', from_name)
             if not from_station:
                 raise HttpException(requests.codes['bad_request'], "fromStation: no rows")
 
-
-            c.execute(sql, (to_name, ))
-            to_station = c.fetchone()
+            to_station = filter_by_column(station_master, 'name', to_name)
             if not to_station:
                 raise HttpException(requests.codes['bad_request'], "toStation: no rows")
-
 
             is_nobori = False
             if from_station["distance"] > to_station["distance"]:
@@ -311,25 +309,25 @@ def get_train_search():
             usable_train_class_list = get_usable_train_class_list(from_station, to_station)
             app.logger.warn("{}".format(usable_train_class_list))
 
-            sql = "SELECT * FROM station_master ORDER BY distance"
+            station_list = station_master_order_by_distance
             if is_nobori:
-                # 上りだったら駅リストを逆にする
-                sql += " DESC"
+                station_list = station_list[::-1]
 
-            c.execute(sql)
-            station_list = c.fetchall()
+            use_at_date = str(use_at.date())
 
             if not train_class:
-                sql = "SELECT * FROM train_master WHERE date=%s AND is_nobori=%s"
-                c.execute(sql, (str(use_at.date()), is_nobori))
+                train_list = ([
+                    train for train in train_master 
+                    if str(train['date']) == use_at_date 
+                    and train['is_nobori'] == is_nobori
+                ])
             else:
-                sql = "SELECT * FROM train_master WHERE date=%s AND is_nobori=%s AND train_class=%s"
-                c.execute(sql, (str(use_at.date()), is_nobori, train_class))
-
-            train_search_response_list = []
-
-            train_list = c.fetchall()
-
+                train_list = ([
+                    train for train in train_master 
+                    if train['date'] == use_at_date 
+                    and train['is_nobori'] == is_nobori
+                    and train['tran_class'] == train_class
+                ])
             for train in train_list:
 
                 if train["train_class"] not in usable_train_class_list:
@@ -388,10 +386,11 @@ def get_train_search():
                         # 乗りたい時刻より出発時刻が前なので除外
                         continue
 
-                    premium_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", False)
-                    premium_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", True)
-                    reserved_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", False)
-                    reserved_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", True)
+                    # premium_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", False)
+                    # premium_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "premium", True)
+                    # reserved_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", False)
+                    # reserved_smoke_avail_seats = get_available_seats_from_train(c, train, from_station, to_station, "reserved", True)
+                    premium_avail_seats, premium_smoke_avail_seats, reserved_avail_seats, reserved_smoke_avail_seats = [], [], [], []
 
                     premium_avail = "○"
                     if len(premium_avail_seats) == 0:
@@ -814,14 +813,17 @@ def post_reserve():
 
 
                 # 予約情報の乗車区間の駅IDを求める
-                sql = "SELECT * FROM station_master WHERE name=%s"
-                c.execute(sql, (reservation["departure"],))
-                reservedfromStation = c.fetchone()
+                # sql = "SELECT * FROM station_master WHERE name=%s"
+                # c.execute(sql, (reservation["departure"],))
+                # reservedfromStation = c.fetchone()
+                reservedfromStation = filter_by_column(station_master, 'name', reservation['departure'])
+                print('========', reservedfromStation)
                 if not reservedfromStation:
                     raise HttpException(requests.codes['internal_server_error'], "予約情報に記載された列車の乗車駅データがみつかりません")
 
-                c.execute(sql, (reservation["arrival"],))
-                reservedtoStation = c.fetchone()
+                # c.execute(sql, (reservation["arrival"],))
+                # reservedtoStation = c.fetchone()
+                reservedtoStation = filter_by_column(station_master, 'name', reservation['arrival'])
                 if not reservedtoStation:
                     raise HttpException(requests.codes['internal_server_error'], "予約情報に記載された列車の降車駅データがみつかりません")
 

@@ -21,13 +21,17 @@ def dbh():
 def main():
     parser = ArgumentParser()
     parser.add_argument("-t", "--table_name", type=str)
-
+    parser.add_argument("-o", "--order_by_column", type=str)
     args = parser.parse_args()
+
     try:
         conn = dbh()
         station_list = []
         with conn.cursor() as c:
             sql = "SELECT * FROM `{}`".format(args.table_name)
+            if args.order_by_column:
+                sql += 'ORDER BY `{}`'.format(args.order_by_column)
+
             c.execute(sql)
 
             while True:
@@ -42,7 +46,11 @@ def main():
         app.logger.exception(err)
         raise HttpException(requests.codes['internal_server_error'], "db error")
 
-    with open("{}.pkl".format(args.table_name), "wb") as fout:
+    filename = args.table_name
+    if args.order_by_column:
+        filename += '_order_by_{}'.format(args.order_by_column)
+
+    with open("{}.pkl".format(filename), "wb") as fout:
         pickle.dump(station_list, fout)
 
 
