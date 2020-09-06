@@ -85,5 +85,6 @@ CREATE TABLE `users` (
   `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `email` varchar(300) NOT NULL UNIQUE,
   `salt` varbinary(1024) NOT NULL,
-  `super_secure_password` varbinary(256) NOT NULL
+  `super_secure_password` varbinary(256) NOT NULL,
+  INDEX idx_email (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
