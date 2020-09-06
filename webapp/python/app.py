@@ -551,7 +551,7 @@ def get_train_seats():
                 seat_roweservation_list = c.fetchall()
                 for seat_roweservation in seat_roweservation_list:
                     sql = "SELECT * FROM reservations WHERE reservation_id=%s"
-                    c.execute(sql, (seat_reservation["reservation_id"],))
+                    c.execute(sql, (seat_roweservation["reservation_id"],))
                     reservation = c.fetchone()
 
                     sql  = "SELECT * FROM station_master WHERE name=%s"
